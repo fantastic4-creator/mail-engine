@@ -1,0 +1,7 @@
+.m2/
+backend/.m2/
+target/
+**/target/
+.idea/
+*.iml
+.DS_Store

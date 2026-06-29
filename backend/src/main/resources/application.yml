@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: mail-engine-backend
+
+mail-engine:
+  runtime:
+    delivery-mode: ${MAIL_ENGINE_DELIVERY_MODE:local-outbox}
+    storage-mode: ${MAIL_ENGINE_STORAGE_MODE:in-memory}
+    smtp-relay-mode: ${MAIL_ENGINE_SMTP_RELAY_MODE:disabled}
+    smtp-host: ${MAIL_ENGINE_SMTP_HOST:localhost}
+    smtp-port: ${MAIL_ENGINE_SMTP_PORT:1025}
+    smtp-username: ${MAIL_ENGINE_SMTP_USERNAME:}
+    smtp-password: ${MAIL_ENGINE_SMTP_PASSWORD:}
+    smtp-starttls-enabled: ${MAIL_ENGINE_SMTP_STARTTLS_ENABLED:false}
+    smtp-auth-enabled: ${MAIL_ENGINE_SMTP_AUTH_ENABLED:false}
+    from-local-part: ${MAIL_ENGINE_FROM_LOCAL_PART:no-reply}
+    dkim-selector: ${MAIL_ENGINE_DKIM_SELECTOR:me1}
+    spf-record-value: ${MAIL_ENGINE_SPF_RECORD_VALUE:v=spf1 mx ~all}
+    dmarc-policy: ${MAIL_ENGINE_DMARC_POLICY:none}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: 8080
