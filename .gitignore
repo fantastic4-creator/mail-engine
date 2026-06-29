@@ -5,3 +5,7 @@ target/
 .idea/
 *.iml
 .DS_Store
+
+# Deployment secrets — never commit these
+scripts/.state
+.env

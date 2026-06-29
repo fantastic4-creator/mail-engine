@@ -18,9 +18,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "mail-engine.runtime.storage-mode", havingValue = "in-memory", matchIfMissing = true)
 public class InMemoryPlatformStateStore implements PlatformStateStore {
 
     private final ConcurrentMap<UUID, Tenant> tenants = new ConcurrentHashMap<>();
