@@ -2,6 +2,7 @@ package com.mailengine.api;
 
 import com.mailengine.api.dto.CampaignResponse;
 import com.mailengine.api.dto.CreateCampaignRequest;
+import com.mailengine.api.dto.ImportRecipientsResponse;
 import com.mailengine.api.dto.MessageJobResponse;
 import com.mailengine.api.dto.OutboundMessageResponse;
 import com.mailengine.service.CampaignService;
@@ -14,8 +15,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/campaigns")
@@ -41,6 +44,13 @@ public class CampaignController {
     @GetMapping("/{campaignId}")
     public CampaignResponse getCampaign(@PathVariable UUID campaignId) {
         return campaignService.getCampaign(campaignId);
+    }
+
+    @PostMapping("/{campaignId}/recipients/import")
+    public ImportRecipientsResponse importRecipients(
+            @PathVariable UUID campaignId,
+            @RequestParam("file") MultipartFile file) {
+        return campaignService.importRecipients(campaignId, file);
     }
 
     @GetMapping("/{campaignId}/jobs")

@@ -7,12 +7,11 @@ set -euo pipefail
 APP_USER="mailengine"
 APP_DIR="/opt/mail-engine"
 APP_PORT="8080"
-JAVA_VERSION="25"
-SDKMAN_DIR="/opt/sdkman"
+JAVA_PACKAGE="java-21-amazon-corretto-headless"
 
 # ─── System update ────────────────────────────────────────────────────────────
-dnf update -y
-dnf install -y curl unzip zip tar which
+dnf update -y --allowerasing
+dnf install -y --allowerasing curl unzip zip tar which
 
 # ─── Create app user ──────────────────────────────────────────────────────────
 if ! id "$APP_USER" &>/dev/null; then
@@ -22,17 +21,10 @@ fi
 mkdir -p "${APP_DIR}/logs" "${APP_DIR}/config"
 chown -R "${APP_USER}:${APP_USER}" "$APP_DIR"
 
-# ─── Install Java via SDKMAN (system-wide) ───────────────────────────────────
-# SDKMAN is installed system-wide under /opt/sdkman so all users can use it.
-export SDKMAN_DIR
-curl -fsSL "https://get.sdkman.io" | bash
-source "${SDKMAN_DIR}/bin/sdkman-init.sh"
-
-# Install the latest Temurin build for Java 25 (or latest available)
-sdk install java "${JAVA_VERSION}-tem" || sdk install java "$(sdk list java | grep 'tem' | head -1 | awk '{print $NF}')"
-sdk default java "$(sdk list java | grep 'installed' | grep 'tem' | head -1 | awk '{print $NF}')"
-
-JAVA_BIN="$(sdk home java current)/bin/java"
+# ─── Install Java 21 (Amazon Corretto — available in AL2023 repos) ───────────
+dnf install -y "${JAVA_PACKAGE}"
+JAVA_BIN="$(alternatives --list | grep java | grep -v javac | awk '{print $3}' | head -1)"
+[[ -z "$JAVA_BIN" ]] && JAVA_BIN="/usr/bin/java"
 
 # ─── systemd service ──────────────────────────────────────────────────────────
 cat > /etc/systemd/system/mail-engine.service <<EOF

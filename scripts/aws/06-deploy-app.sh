@@ -8,14 +8,17 @@ require_state "KEY_FILE"
 require_state "RDS_ENDPOINT"
 require_state "DB_PASSWORD"
 
+# Set DELIVERY_MODE=smtp once Postfix is installed and a sending domain is configured.
+DELIVERY_MODE="${DELIVERY_MODE:-local-outbox}"
+
 BACKEND_DIR="$(dirname "$0")/../../backend"
 JAR_PATTERN="${BACKEND_DIR}/target/mail-engine-backend-*.jar"
 
 # ─── Build ────────────────────────────────────────────────────────────────────
 info "Building fat JAR..."
-(cd "$BACKEND_DIR" && ./mvnw clean package -DskipTests -q)
+(cd "$BACKEND_DIR" && mvn clean package -DskipTests -q)
 
-JAR_PATH=$(ls $JAR_PATTERN 2>/dev/null | head -1)
+JAR_PATH=$(find "$BACKEND_DIR/target" -maxdepth 1 -name "mail-engine-backend-*.jar" ! -name "*.original" 2>/dev/null | head -1)
 [[ -z "$JAR_PATH" ]] && err "JAR not found after build. Check Maven output."
 info "JAR: $(basename "$JAR_PATH")"
 
@@ -42,7 +45,7 @@ ssh $SSH_OPTS "ec2-user@${ELASTIC_IP}" "sudo tee ${APP_DIR}/config/app.env > /de
 # Mail Engine runtime config — do not commit this file
 SERVER_PORT=${APP_PORT}
 
-MAIL_ENGINE_DELIVERY_MODE=smtp
+MAIL_ENGINE_DELIVERY_MODE=${DELIVERY_MODE}
 MAIL_ENGINE_STORAGE_MODE=postgres
 MAIL_ENGINE_SMTP_HOST=localhost
 MAIL_ENGINE_SMTP_PORT=25
