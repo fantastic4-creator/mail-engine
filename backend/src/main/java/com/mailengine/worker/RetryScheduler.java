@@ -3,7 +3,6 @@ package com.mailengine.worker;
 import com.mailengine.data.PlatformStateStore;
 import com.mailengine.domain.MessageJob;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

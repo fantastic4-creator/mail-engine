@@ -24,10 +24,6 @@ public class OutboundMessageEntity {
     String outboundIpAddress;
     String recipientEmail;
     String subject;
-
-    @Column(columnDefinition = "text")
-    String body;
-
     String deliveryStatus;
 
     @Column(nullable = false)
@@ -47,7 +43,6 @@ public class OutboundMessageEntity {
         e.outboundIpAddress = m.outboundIpAddress();
         e.recipientEmail = m.recipientEmail();
         e.subject = m.subject();
-        e.body = m.body();
         e.deliveryStatus = m.deliveryStatus();
         e.sentAt = m.sentAt();
         return e;
@@ -56,6 +51,6 @@ public class OutboundMessageEntity {
     public OutboundMessage toDomain() {
         return new OutboundMessage(id, messageJobId, campaignId, tenantId, domainId,
                 ipPoolId, outboundIpId, outboundIpAddress, recipientEmail, subject,
-                body, deliveryStatus, sentAt);
+                deliveryStatus, sentAt);
     }
 }

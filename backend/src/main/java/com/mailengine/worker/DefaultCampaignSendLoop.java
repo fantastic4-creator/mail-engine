@@ -10,7 +10,6 @@ import com.mailengine.domain.MessageJobStatus;
 import com.mailengine.domain.OutboundIp;
 import com.mailengine.domain.OutboundMessage;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -33,8 +32,7 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
     }
 
     @Override
-    public List<OutboundMessage> process(Campaign campaign, OutboundIp outboundIp) {
-        List<OutboundMessage> deliveredMessages = new ArrayList<>();
+    public void process(Campaign campaign, OutboundIp outboundIp) {
         List<MessageJob> claimedJobs = store.claimPendingMessageJobs(campaign.id(), LOCAL_CLAIM_LIMIT);
 
         for (MessageJob messageJob : claimedJobs) {
@@ -58,7 +56,6 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
             } else {
                 store.saveMessageJob(messageJob.complete(MessageJobStatus.SENT, outboundMessage.sentAt(), null));
             }
-            deliveredMessages.add(outboundMessage);
         }
 
         boolean hasPending = store.listMessageJobs(campaign.id()).stream()
@@ -66,7 +63,5 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
         if (!hasPending) {
             store.saveCampaign(campaign.withStatus(CampaignStatus.SENT));
         }
-
-        return deliveredMessages;
     }
 }

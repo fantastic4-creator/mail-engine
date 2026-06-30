@@ -11,7 +11,6 @@ import com.mailengine.domain.CampaignStatus;
 import com.mailengine.domain.DomainVerificationStatus;
 import com.mailengine.domain.MessageJob;
 import com.mailengine.domain.MessageJobStatus;
-import com.mailengine.domain.OutboundIp;
 import com.mailengine.domain.OutboundMessage;
 import com.mailengine.domain.Recipient;
 import com.mailengine.domain.SendingDomain;

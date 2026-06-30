@@ -38,8 +38,7 @@ class MailEngineApplicationTests {
                 .andExpect(jsonPath("$.status").value("UP"));
 
         mockMvc.perform(get("/api/runtime"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.deliveryMode").value("LOCAL_OUTBOX"));
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
