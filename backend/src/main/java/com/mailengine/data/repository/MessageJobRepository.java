@@ -49,6 +49,12 @@ public interface MessageJobRepository extends JpaRepository<MessageJobEntity, UU
             @Param("ids") List<UUID> ids,
             @Param("pending") MessageJobStatus pending);
 
+    @Query("SELECT COUNT(j) FROM MessageJobEntity j WHERE j.tenantId = :tenantId AND j.status = :status AND j.completedAt >= :since")
+    int countByTenantIdAndStatusAndCompletedAtAfter(
+            @Param("tenantId") UUID tenantId,
+            @Param("status") MessageJobStatus status,
+            @Param("since") Instant since);
+
     @Modifying
     @Query("UPDATE MessageJobEntity j SET j.status = :newStatus, j.completedAt = :now, j.lastError = :reason WHERE j.campaignId = :campaignId AND j.status IN :statuses")
     int cancelActiveJobs(

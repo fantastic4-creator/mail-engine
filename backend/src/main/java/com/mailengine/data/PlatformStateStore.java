@@ -10,6 +10,7 @@ import com.mailengine.domain.Recipient;
 import com.mailengine.domain.SendingDomain;
 import com.mailengine.domain.SuppressionRecord;
 import com.mailengine.domain.Tenant;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -83,4 +84,6 @@ public interface PlatformStateStore {
     void touchApiKeyLastUsed(UUID keyId);
 
     int cancelCampaignJobs(UUID campaignId);
+
+    int countSentJobsSince(UUID tenantId, Instant since);
 }

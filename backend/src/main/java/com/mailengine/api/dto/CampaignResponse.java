@@ -11,6 +11,7 @@ public record CampaignResponse(
         String subject,
         int recipientCount,
         int messageJobCount,
+        int maxSendsPerHour,
         String status,
         Instant createdAt
 ) {

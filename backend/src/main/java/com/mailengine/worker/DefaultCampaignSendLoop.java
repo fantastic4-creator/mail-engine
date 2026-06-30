@@ -33,7 +33,19 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
 
     @Override
     public void process(Campaign campaign, OutboundIp outboundIp) {
-        List<MessageJob> claimedJobs = store.claimPendingMessageJobs(campaign.id(), LOCAL_CLAIM_LIMIT);
+        int maxPerHour = campaign.maxSendsPerHour() > 0
+                ? campaign.maxSendsPerHour()
+                : runtimeProperties.getMaxSendsPerHour();
+
+        List<MessageJob> claimedJobs;
+        if (maxPerHour > 0) {
+            int sentLastHour = store.countSentJobsSince(campaign.tenantId(), Instant.now().minusSeconds(3600));
+            int remaining = maxPerHour - sentLastHour;
+            if (remaining <= 0) return;
+            claimedJobs = store.claimPendingMessageJobs(campaign.id(), Math.min(LOCAL_CLAIM_LIMIT, remaining));
+        } else {
+            claimedJobs = store.claimPendingMessageJobs(campaign.id(), LOCAL_CLAIM_LIMIT);
+        }
 
         for (MessageJob messageJob : claimedJobs) {
             if (store.isSuppressed(messageJob.tenantId(), messageJob.recipientEmail())) {
