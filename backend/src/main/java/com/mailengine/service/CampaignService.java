@@ -7,6 +7,7 @@ import com.mailengine.api.dto.MessageJobResponse;
 import com.mailengine.api.dto.OutboundMessageResponse;
 import com.mailengine.data.PlatformStateStore;
 import com.mailengine.domain.Campaign;
+import com.mailengine.domain.CampaignStatus;
 import com.mailengine.domain.DomainVerificationStatus;
 import com.mailengine.domain.MessageJob;
 import com.mailengine.domain.MessageJobStatus;
@@ -15,7 +16,6 @@ import com.mailengine.domain.OutboundMessage;
 import com.mailengine.domain.Recipient;
 import com.mailengine.domain.SendingDomain;
 import com.mailengine.domain.Tenant;
-import com.mailengine.worker.CampaignSendLoop;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -37,11 +37,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class CampaignService {
 
     private final PlatformStateStore store;
-    private final CampaignSendLoop campaignSendLoop;
 
-    public CampaignService(PlatformStateStore store, CampaignSendLoop campaignSendLoop) {
+    public CampaignService(PlatformStateStore store) {
         this.store = store;
-        this.campaignSendLoop = campaignSendLoop;
     }
 
     public CampaignResponse createCampaign(CreateCampaignRequest request) {
@@ -55,7 +53,7 @@ public class CampaignService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Domain must be verified before sending");
         }
 
-        OutboundIp outboundIp = store.findFirstActiveOutboundIp(tenant.id())
+        store.findFirstActiveOutboundIp(tenant.id())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant must have an active outbound IP before sending"));
 
         List<String> recipientEmails = normalizeRecipients(request);
@@ -68,6 +66,7 @@ public class CampaignService {
                 request.subject().trim(),
                 request.body(),
                 recipientEmails.size(),
+                CampaignStatus.SENDING,
                 now
         );
         store.saveCampaign(campaign);
@@ -92,11 +91,11 @@ public class CampaignService {
                     null,
                     null,
                     null,
+                    0,
+                    null,
                     now
             ));
         });
-
-        campaignSendLoop.process(campaign, outboundIp);
 
         return toResponse(campaign);
     }
@@ -105,7 +104,7 @@ public class CampaignService {
         Campaign campaign = store.findCampaign(campaignId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found"));
 
-        OutboundIp outboundIp = store.findFirstActiveOutboundIp(campaign.tenantId())
+        store.findFirstActiveOutboundIp(campaign.tenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active outbound IP for tenant"));
 
         List<String> rawEmails;
@@ -134,16 +133,16 @@ public class CampaignService {
                     new Recipient(UUID.randomUUID(), campaign.tenantId(), campaignId, email, now));
             store.saveMessageJob(new MessageJob(
                     UUID.randomUUID(), campaignId, campaign.tenantId(), campaign.domainId(),
-                    recipient.id(), email, MessageJobStatus.PENDING, now, null, null, null, now));
+                    recipient.id(), email, MessageJobStatus.PENDING, now, null, null, null,
+                    0, null, now));
         });
 
         if (!newEmails.isEmpty()) {
             Campaign updated = new Campaign(
                     campaign.id(), campaign.tenantId(), campaign.domainId(),
                     campaign.name(), campaign.subject(), campaign.body(),
-                    campaign.recipientCount() + newEmails.size(), campaign.createdAt());
+                    campaign.recipientCount() + newEmails.size(), campaign.status(), campaign.createdAt());
             store.saveCampaign(updated);
-            campaignSendLoop.process(updated, outboundIp);
         }
 
         return new ImportRecipientsResponse(newEmails.size(), skipped, existingEmails.size() + newEmails.size());
@@ -184,13 +183,11 @@ public class CampaignService {
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isBlank() || line.startsWith("#")) continue;
-                // Skip a header row whose first column is literally "email"
                 if (firstLine && line.toLowerCase(Locale.ROOT).startsWith("email")) {
                     firstLine = false;
                     continue;
                 }
                 firstLine = false;
-                // Take first CSV column and strip surrounding quotes
                 String email = line.split(",")[0].trim().replace("\"", "");
                 if (!email.isBlank()) emails.add(email);
             }
@@ -207,6 +204,7 @@ public class CampaignService {
                 campaign.subject(),
                 campaign.recipientCount(),
                 store.listMessageJobs(campaign.id()).size(),
+                campaign.status().name(),
                 campaign.createdAt()
         );
     }

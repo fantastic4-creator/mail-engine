@@ -47,6 +47,8 @@ public interface PlatformStateStore {
 
     List<Campaign> listCampaigns();
 
+    List<Campaign> listCampaignsWithPendingJobs();
+
     Recipient saveRecipient(Recipient recipient);
 
     List<Recipient> listRecipients(UUID campaignId);
@@ -54,6 +56,8 @@ public interface PlatformStateStore {
     MessageJob saveMessageJob(MessageJob messageJob);
 
     List<MessageJob> claimPendingMessageJobs(UUID campaignId, int limit);
+
+    List<MessageJob> claimDueRetryJobs(int limit);
 
     List<MessageJob> listMessageJobs(UUID campaignId);
 

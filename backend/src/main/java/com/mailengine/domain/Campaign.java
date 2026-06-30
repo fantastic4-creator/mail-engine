@@ -11,6 +11,10 @@ public record Campaign(
         String subject,
         String body,
         int recipientCount,
+        CampaignStatus status,
         Instant createdAt
 ) {
+    public Campaign withStatus(CampaignStatus status) {
+        return new Campaign(id, tenantId, domainId, name, subject, body, recipientCount, status, createdAt);
+    }
 }

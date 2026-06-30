@@ -47,6 +47,11 @@ public class MessageJobEntity {
     String lastError;
 
     @Column(nullable = false)
+    int retryCount;
+
+    Instant nextRetryAt;
+
+    @Column(nullable = false)
     Instant createdAt;
 
     protected MessageJobEntity() {}
@@ -64,6 +69,8 @@ public class MessageJobEntity {
         e.claimedAt = j.claimedAt();
         e.completedAt = j.completedAt();
         e.lastError = j.lastError();
+        e.retryCount = j.retryCount();
+        e.nextRetryAt = j.nextRetryAt();
         e.createdAt = j.createdAt();
         return e;
     }
@@ -72,6 +79,7 @@ public class MessageJobEntity {
 
     public MessageJob toDomain() {
         return new MessageJob(id, campaignId, tenantId, domainId, recipientId,
-                recipientEmail, status, scheduledAt, claimedAt, completedAt, lastError, createdAt);
+                recipientEmail, status, scheduledAt, claimedAt, completedAt, lastError,
+                retryCount, nextRetryAt, createdAt);
     }
 }

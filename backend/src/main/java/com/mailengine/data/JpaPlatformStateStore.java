@@ -176,6 +176,14 @@ public class JpaPlatformStateStore implements PlatformStateStore {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Campaign> listCampaignsWithPendingJobs() {
+        return campaigns.findCampaignsWithJobStatus(MessageJobStatus.PENDING).stream()
+                .map(CampaignEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public Recipient saveRecipient(Recipient recipient) {
         return recipients.save(RecipientEntity.from(recipient)).toDomain();
     }
@@ -203,6 +211,21 @@ public class JpaPlatformStateStore implements PlatformStateStore {
         }
         List<UUID> ids = pending.stream().map(MessageJobEntity::getId).toList();
         messageJobs.markClaimed(ids, MessageJobStatus.CLAIMED, now);
+        return messageJobs.findAllById(ids).stream()
+                .map(MessageJobEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<MessageJob> claimDueRetryJobs(int limit) {
+        Instant now = Instant.now();
+        List<MessageJobEntity> due = messageJobs.lockRetryJobs(
+                MessageJobStatus.RETRY_SCHEDULED, now, PageRequest.of(0, limit));
+        if (due.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = due.stream().map(MessageJobEntity::getId).toList();
+        messageJobs.resetRetryToPending(ids, MessageJobStatus.PENDING);
         return messageJobs.findAllById(ids).stream()
                 .map(MessageJobEntity::toDomain)
                 .toList();

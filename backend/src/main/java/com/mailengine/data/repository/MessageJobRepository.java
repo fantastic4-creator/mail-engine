@@ -28,10 +28,24 @@ public interface MessageJobRepository extends JpaRepository<MessageJobEntity, UU
             @Param("status") MessageJobStatus status,
             Pageable pageable);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
+    @Query("SELECT j FROM MessageJobEntity j WHERE j.status = :status AND j.nextRetryAt <= :now ORDER BY j.nextRetryAt")
+    List<MessageJobEntity> lockRetryJobs(
+            @Param("status") MessageJobStatus status,
+            @Param("now") Instant now,
+            Pageable pageable);
+
     @Modifying
     @Query("UPDATE MessageJobEntity j SET j.status = :status, j.claimedAt = :claimedAt WHERE j.id IN :ids")
     void markClaimed(
             @Param("ids") List<UUID> ids,
             @Param("status") MessageJobStatus status,
             @Param("claimedAt") Instant claimedAt);
+
+    @Modifying
+    @Query("UPDATE MessageJobEntity j SET j.status = :pending, j.claimedAt = null, j.nextRetryAt = null WHERE j.id IN :ids")
+    void resetRetryToPending(
+            @Param("ids") List<UUID> ids,
+            @Param("pending") MessageJobStatus pending);
 }

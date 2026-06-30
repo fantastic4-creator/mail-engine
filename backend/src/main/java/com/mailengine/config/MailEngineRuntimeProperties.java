@@ -18,6 +18,11 @@ public class MailEngineRuntimeProperties {
     private String dkimSelector = "me1";
     private String spfRecordValue = "v=spf1 mx ~all";
     private String dmarcPolicy = "none";
+    private String appBaseUrl = "http://localhost:8080";
+    private String unsubscribeHmacSecret = "change-me-in-production";
+    private long sendLoopPollMs = 5000;
+    private int retryMaxAttempts = 5;
+    private long retryBackoffSeconds = 300;
 
     public DeliveryMode getDeliveryMode() {
         return deliveryMode;
@@ -121,6 +126,46 @@ public class MailEngineRuntimeProperties {
 
     public void setDmarcPolicy(String dmarcPolicy) {
         this.dmarcPolicy = dmarcPolicy;
+    }
+
+    public String getAppBaseUrl() {
+        return appBaseUrl;
+    }
+
+    public void setAppBaseUrl(String appBaseUrl) {
+        this.appBaseUrl = appBaseUrl;
+    }
+
+    public String getUnsubscribeHmacSecret() {
+        return unsubscribeHmacSecret;
+    }
+
+    public void setUnsubscribeHmacSecret(String unsubscribeHmacSecret) {
+        this.unsubscribeHmacSecret = unsubscribeHmacSecret;
+    }
+
+    public long getSendLoopPollMs() {
+        return sendLoopPollMs;
+    }
+
+    public void setSendLoopPollMs(long sendLoopPollMs) {
+        this.sendLoopPollMs = sendLoopPollMs;
+    }
+
+    public int getRetryMaxAttempts() {
+        return retryMaxAttempts;
+    }
+
+    public void setRetryMaxAttempts(int retryMaxAttempts) {
+        this.retryMaxAttempts = retryMaxAttempts;
+    }
+
+    public long getRetryBackoffSeconds() {
+        return retryBackoffSeconds;
+    }
+
+    public void setRetryBackoffSeconds(long retryBackoffSeconds) {
+        this.retryBackoffSeconds = retryBackoffSeconds;
     }
 
     public enum DeliveryMode {

@@ -1,0 +1,10 @@
+ALTER TABLE campaign
+    ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'SENDING';
+
+ALTER TABLE message_job
+    ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS next_retry_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS message_job_retry
+    ON message_job (next_retry_at)
+    WHERE status = 'RETRY_SCHEDULED';

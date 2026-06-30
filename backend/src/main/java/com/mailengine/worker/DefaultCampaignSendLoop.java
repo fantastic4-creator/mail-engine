@@ -1,8 +1,10 @@
 package com.mailengine.worker;
 
+import com.mailengine.config.MailEngineRuntimeProperties;
 import com.mailengine.data.PlatformStateStore;
 import com.mailengine.delivery.DeliveryGateway;
 import com.mailengine.domain.Campaign;
+import com.mailengine.domain.CampaignStatus;
 import com.mailengine.domain.MessageJob;
 import com.mailengine.domain.MessageJobStatus;
 import com.mailengine.domain.OutboundIp;
@@ -19,10 +21,15 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
 
     private final PlatformStateStore store;
     private final DeliveryGateway deliveryGateway;
+    private final MailEngineRuntimeProperties runtimeProperties;
 
-    public DefaultCampaignSendLoop(PlatformStateStore store, DeliveryGateway deliveryGateway) {
+    public DefaultCampaignSendLoop(
+            PlatformStateStore store,
+            DeliveryGateway deliveryGateway,
+            MailEngineRuntimeProperties runtimeProperties) {
         this.store = store;
         this.deliveryGateway = deliveryGateway;
+        this.runtimeProperties = runtimeProperties;
     }
 
     @Override
@@ -38,15 +45,26 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
 
             OutboundMessage outboundMessage = deliveryGateway.deliver(campaign, messageJob, outboundIp);
             if (outboundMessage.deliveryStatus().startsWith("SMTP_FAILED")) {
-                store.saveMessageJob(messageJob.complete(
-                        MessageJobStatus.FAILED,
-                        outboundMessage.sentAt(),
-                        outboundMessage.deliveryStatus()
-                ));
+                if (messageJob.retryCount() < runtimeProperties.getRetryMaxAttempts()) {
+                    long backoffSeconds = runtimeProperties.getRetryBackoffSeconds() * (1L << messageJob.retryCount());
+                    Instant nextRetryAt = Instant.now().plusSeconds(backoffSeconds);
+                    store.saveMessageJob(messageJob.scheduleRetry(nextRetryAt));
+                } else {
+                    store.saveMessageJob(messageJob.complete(
+                            MessageJobStatus.FAILED,
+                            outboundMessage.sentAt(),
+                            outboundMessage.deliveryStatus()));
+                }
             } else {
                 store.saveMessageJob(messageJob.complete(MessageJobStatus.SENT, outboundMessage.sentAt(), null));
             }
             deliveredMessages.add(outboundMessage);
+        }
+
+        boolean hasPending = store.listMessageJobs(campaign.id()).stream()
+                .anyMatch(j -> j.status() == MessageJobStatus.PENDING || j.status() == MessageJobStatus.CLAIMED);
+        if (!hasPending) {
+            store.saveCampaign(campaign.withStatus(CampaignStatus.SENT));
         }
 
         return deliveredMessages;

@@ -141,6 +141,17 @@ public class InMemoryPlatformStateStore implements PlatformStateStore {
     }
 
     @Override
+    public List<Campaign> listCampaignsWithPendingJobs() {
+        return messageJobs.values().stream()
+                .filter(j -> j.status() == MessageJobStatus.PENDING)
+                .map(MessageJob::campaignId)
+                .distinct()
+                .map(campaigns::get)
+                .filter(c -> c != null)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Recipient saveRecipient(Recipient recipient) {
         recipients.put(recipient.id(), recipient);
         return recipient;
@@ -170,6 +181,23 @@ public class InMemoryPlatformStateStore implements PlatformStateStore {
                 .sorted(Comparator.comparing(MessageJob::createdAt))
                 .limit(limit)
                 .map(messageJob -> saveMessageJob(messageJob.claim(now)))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<MessageJob> claimDueRetryJobs(int limit) {
+        Instant now = Instant.now();
+        List<MessageJob> dueJobs = messageJobs.values().stream()
+                .filter(j -> j.status() == MessageJobStatus.RETRY_SCHEDULED)
+                .filter(j -> j.nextRetryAt() != null && !j.nextRetryAt().isAfter(now))
+                .sorted(Comparator.comparing(MessageJob::nextRetryAt))
+                .limit(limit)
+                .collect(Collectors.toList());
+        return dueJobs.stream()
+                .map(j -> saveMessageJob(new MessageJob(
+                        j.id(), j.campaignId(), j.tenantId(), j.domainId(),
+                        j.recipientId(), j.recipientEmail(), MessageJobStatus.PENDING,
+                        j.scheduledAt(), null, null, null, j.retryCount(), null, j.createdAt())))
                 .collect(Collectors.toList());
     }
 

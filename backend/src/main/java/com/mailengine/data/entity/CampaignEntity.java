@@ -1,8 +1,11 @@
 package com.mailengine.data.entity;
 
 import com.mailengine.domain.Campaign;
+import com.mailengine.domain.CampaignStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -33,6 +36,10 @@ public class CampaignEntity {
     @Column(nullable = false)
     int recipientCount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    CampaignStatus status;
+
     @Column(nullable = false)
     Instant createdAt;
 
@@ -47,11 +54,12 @@ public class CampaignEntity {
         e.subject = c.subject();
         e.body = c.body();
         e.recipientCount = c.recipientCount();
+        e.status = c.status();
         e.createdAt = c.createdAt();
         return e;
     }
 
     public Campaign toDomain() {
-        return new Campaign(id, tenantId, domainId, name, subject, body, recipientCount, createdAt);
+        return new Campaign(id, tenantId, domainId, name, subject, body, recipientCount, status, createdAt);
     }
 }

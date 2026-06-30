@@ -11,6 +11,7 @@ public record CampaignResponse(
         String subject,
         int recipientCount,
         int messageJobCount,
+        String status,
         Instant createdAt
 ) {
 }

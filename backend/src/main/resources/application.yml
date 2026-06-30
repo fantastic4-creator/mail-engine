@@ -35,6 +35,11 @@ mail-engine:
     dkim-selector: ${MAIL_ENGINE_DKIM_SELECTOR:me1}
     spf-record-value: ${MAIL_ENGINE_SPF_RECORD_VALUE:v=spf1 mx ~all}
     dmarc-policy: ${MAIL_ENGINE_DMARC_POLICY:none}
+    app-base-url: ${MAIL_ENGINE_APP_BASE_URL:http://localhost:8080}
+    unsubscribe-hmac-secret: ${MAIL_ENGINE_UNSUBSCRIBE_HMAC_SECRET:change-me-in-production}
+    send-loop-poll-ms: ${MAIL_ENGINE_SEND_LOOP_POLL_MS:5000}
+    retry-max-attempts: ${MAIL_ENGINE_RETRY_MAX_ATTEMPTS:5}
+    retry-backoff-seconds: ${MAIL_ENGINE_RETRY_BACKOFF_SECONDS:300}
 
 management:
   endpoints:

@@ -11,9 +11,15 @@ import com.mailengine.domain.DomainVerificationStatus;
 import com.mailengine.domain.SendingDomain;
 import com.mailengine.domain.Tenant;
 import java.time.Instant;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -86,6 +92,38 @@ public class TenantService {
         SendingDomain domain = requireDomain(domainId);
         if (!domain.tenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found for tenant");
+        }
+
+        String expectedRecord = "mail-engine-verification=" + domain.verificationToken();
+        String lookupName = "_mailengine." + domain.domainName();
+
+        try {
+            Hashtable<String, String> env = new Hashtable<>();
+            env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
+            DirContext ctx = new InitialDirContext(env);
+            Attributes attrs = ctx.getAttributes(lookupName, new String[]{"TXT"});
+            Attribute txtAttr = attrs.get("TXT");
+            if (txtAttr == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "DNS TXT record not found or does not match verification token");
+            }
+            boolean found = false;
+            for (int i = 0; i < txtAttr.size(); i++) {
+                String val = txtAttr.get(i).toString();
+                if (val.contains(expectedRecord)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "DNS TXT record not found or does not match verification token");
+            }
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (NamingException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "DNS TXT record not found or does not match verification token");
         }
 
         SendingDomain verifiedDomain = domain.withVerificationStatus(DomainVerificationStatus.VERIFIED, Instant.now());
