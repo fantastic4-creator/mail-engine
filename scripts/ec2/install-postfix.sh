@@ -22,7 +22,9 @@ postconf -e "inet_interfaces = loopback-only"
 postconf -e "inet_protocols = ipv4"
 postconf -e "mydestination ="
 postconf -e "relayhost ="
-postconf -e "smtp_bind_address = ${ELASTIC_IP}"
+# Do NOT set smtp_bind_address to the Elastic IP — EC2 instances have only the
+# private IP on their network interface; Elastic IP is AWS NAT and cannot be bound.
+# Outbound packets from the private IP appear as the Elastic IP at the internet level.
 postconf -e "smtp_helo_name = ${SMTP_HOSTNAME}"
 
 # Bounce and delivery notifications

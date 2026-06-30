@@ -62,4 +62,9 @@ public class CampaignController {
     public List<OutboundMessageResponse> listOutbox() {
         return campaignService.listOutbox();
     }
+
+    @PostMapping("/{campaignId}/cancel")
+    public CampaignResponse cancelCampaign(@PathVariable UUID campaignId) {
+        return campaignService.cancelCampaign(campaignId);
+    }
 }
