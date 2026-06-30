@@ -86,7 +86,7 @@ mvn spring-boot:run
 
 | Variable | Default | Notes |
 |---|---|---|
-| `MAIL_ENGINE_DELIVERY_MODE` | `local-outbox` | `local-outbox`, `smtp` |
+| `MAIL_ENGINE_DELIVERY_MODE` | `local-outbox` | `local-outbox`, `smtp` (AWS_SMTP_RELAY removed) |
 | `MAIL_ENGINE_STORAGE_MODE` | `in-memory` | `in-memory`, `postgres` |
 | `MAIL_ENGINE_SMTP_HOST` | `localhost` | Production: `localhost` (Postfix relay) |
 | `MAIL_ENGINE_SMTP_PORT` | `1025` | Production: `25` (Postfix) |
@@ -121,6 +121,7 @@ config/         MailEngineRuntimeProperties, AsyncConfig (@EnableAsync @EnableSc
 
 Every request requires an `X-API-Key` header **except** these paths (bootstrap exclusions):
 - `/actuator/**`
+- `/api/health`
 - `/unsubscribe`
 - `/webhooks/**`
 - `POST /api/tenants` — create first tenant
@@ -237,6 +238,19 @@ curl -X POST $BASE/api/campaigns \
 - `.github/workflows/deploy.yml`
 - Tests run on every PR
 - Auto-deploy on push to `main` — requires secrets `EC2_HOST` (`3.208.157.146`) and `EC2_SSH_KEY`
+
+## Git Workflow
+
+- **Always work on `feature/mail-engine`** — never push directly to `main`
+- Push to feature branch → raise PR on GitHub → tests run automatically → merge triggers deploy
+- GitHub Actions: tests on every PR, deploy on merge to `main`
+- Required GitHub secrets: `EC2_HOST=3.208.157.146`, `EC2_SSH_KEY` (contents of `~/.ssh/mail-engine-key.pem`)
+
+## Testing Notes
+
+- `@TestPropertySource(properties = "mail-engine.runtime.skip-domain-verification=true")` on test class bypasses real DNS lookup
+- `sendLoopScheduler.poll()` called manually in tests — async scheduler (5s) doesn't fire fast enough during tests
+- 2 smoke tests: `healthEndpointWorks`, `tenantAndDomainFlowWorks`
 
 ## What Is Not Implemented Yet
 

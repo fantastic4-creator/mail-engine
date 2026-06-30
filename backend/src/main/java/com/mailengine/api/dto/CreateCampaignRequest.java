@@ -23,6 +23,8 @@ public record CreateCampaignRequest(
 
         String recipientEmail,
 
-        List<@NotBlank(message = "recipient email cannot be blank") String> recipientEmails
+        List<@NotBlank(message = "recipient email cannot be blank") String> recipientEmails,
+
+        Integer maxSendsPerHour
 ) {
 }

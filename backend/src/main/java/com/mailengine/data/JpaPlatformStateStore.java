@@ -315,4 +315,9 @@ public class JpaPlatformStateStore implements PlatformStateStore {
                 Instant.now(),
                 "Campaign cancelled");
     }
+
+    @Override
+    public int countSentJobsSince(UUID tenantId, Instant since) {
+        return messageJobs.countByTenantIdAndStatusAndCompletedAtAfter(tenantId, MessageJobStatus.SENT, since);
+    }
 }

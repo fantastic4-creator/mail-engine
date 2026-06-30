@@ -289,4 +289,14 @@ public class InMemoryPlatformStateStore implements PlatformStateStore {
         toCancel.forEach(j -> messageJobs.put(j.id(), j.complete(MessageJobStatus.FAILED, now, "Campaign cancelled")));
         return toCancel.size();
     }
+
+    @Override
+    public int countSentJobsSince(UUID tenantId, Instant since) {
+        return (int) messageJobs.values().stream()
+                .filter(j -> j.tenantId().equals(tenantId)
+                        && j.status() == MessageJobStatus.SENT
+                        && j.completedAt() != null
+                        && j.completedAt().isAfter(since))
+                .count();
+    }
 }

@@ -36,6 +36,9 @@ public class CampaignEntity {
     @Column(nullable = false)
     int recipientCount;
 
+    @Column(nullable = false)
+    int maxSendsPerHour;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     CampaignStatus status;
@@ -54,12 +57,13 @@ public class CampaignEntity {
         e.subject = c.subject();
         e.body = c.body();
         e.recipientCount = c.recipientCount();
+        e.maxSendsPerHour = c.maxSendsPerHour();
         e.status = c.status();
         e.createdAt = c.createdAt();
         return e;
     }
 
     public Campaign toDomain() {
-        return new Campaign(id, tenantId, domainId, name, subject, body, recipientCount, status, createdAt);
+        return new Campaign(id, tenantId, domainId, name, subject, body, recipientCount, maxSendsPerHour, status, createdAt);
     }
 }
