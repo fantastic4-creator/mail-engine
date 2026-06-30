@@ -2,6 +2,7 @@ package com.mailengine.service;
 
 import com.mailengine.api.dto.CampaignResponse;
 import com.mailengine.api.dto.CreateCampaignRequest;
+import com.mailengine.api.dto.ImportRecipientsResponse;
 import com.mailengine.api.dto.MessageJobResponse;
 import com.mailengine.api.dto.OutboundMessageResponse;
 import com.mailengine.data.PlatformStateStore;
@@ -15,14 +16,21 @@ import com.mailengine.domain.Recipient;
 import com.mailengine.domain.SendingDomain;
 import com.mailengine.domain.Tenant;
 import com.mailengine.worker.CampaignSendLoop;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
@@ -93,6 +101,54 @@ public class CampaignService {
         return toResponse(campaign);
     }
 
+    public ImportRecipientsResponse importRecipients(UUID campaignId, MultipartFile file) {
+        Campaign campaign = store.findCampaign(campaignId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found"));
+
+        OutboundIp outboundIp = store.findFirstActiveOutboundIp(campaign.tenantId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No active outbound IP for tenant"));
+
+        List<String> rawEmails;
+        try {
+            rawEmails = parseCsvEmails(file);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Failed to read file: " + e.getMessage());
+        }
+
+        Set<String> existingEmails = store.listRecipients(campaignId).stream()
+                .map(Recipient::email)
+                .collect(Collectors.toSet());
+
+        List<String> newEmails = rawEmails.stream()
+                .filter(e -> e.contains("@"))
+                .map(e -> e.trim().toLowerCase(Locale.ROOT))
+                .distinct()
+                .filter(e -> !existingEmails.contains(e))
+                .toList();
+
+        int skipped = rawEmails.size() - newEmails.size();
+        Instant now = Instant.now();
+
+        newEmails.forEach(email -> {
+            Recipient recipient = store.saveRecipient(
+                    new Recipient(UUID.randomUUID(), campaign.tenantId(), campaignId, email, now));
+            store.saveMessageJob(new MessageJob(
+                    UUID.randomUUID(), campaignId, campaign.tenantId(), campaign.domainId(),
+                    recipient.id(), email, MessageJobStatus.PENDING, now, null, null, null, now));
+        });
+
+        if (!newEmails.isEmpty()) {
+            Campaign updated = new Campaign(
+                    campaign.id(), campaign.tenantId(), campaign.domainId(),
+                    campaign.name(), campaign.subject(), campaign.body(),
+                    campaign.recipientCount() + newEmails.size(), campaign.createdAt());
+            store.saveCampaign(updated);
+            campaignSendLoop.process(updated, outboundIp);
+        }
+
+        return new ImportRecipientsResponse(newEmails.size(), skipped, existingEmails.size() + newEmails.size());
+    }
+
     public List<CampaignResponse> listCampaigns() {
         return store.listCampaigns().stream()
                 .map(this::toResponse)
@@ -117,6 +173,29 @@ public class CampaignService {
         return store.listOutboundMessages().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    private List<String> parseCsvEmails(MultipartFile file) throws IOException {
+        List<String> emails = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            boolean firstLine = true;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isBlank() || line.startsWith("#")) continue;
+                // Skip a header row whose first column is literally "email"
+                if (firstLine && line.toLowerCase(Locale.ROOT).startsWith("email")) {
+                    firstLine = false;
+                    continue;
+                }
+                firstLine = false;
+                // Take first CSV column and strip surrounding quotes
+                String email = line.split(",")[0].trim().replace("\"", "");
+                if (!email.isBlank()) emails.add(email);
+            }
+        }
+        return emails;
     }
 
     private CampaignResponse toResponse(Campaign campaign) {

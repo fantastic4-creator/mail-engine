@@ -1,0 +1,71 @@
+name: Test & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'corretto'
+          cache: maven
+
+      - name: Run tests
+        run: mvn test -Dmaven.repo.local=$HOME/.m2/repository
+
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'corretto'
+          cache: maven
+
+      - name: Build fat JAR
+        run: mvn clean package -DskipTests -Dmaven.repo.local=$HOME/.m2/repository
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "$EC2_SSH_KEY" > /tmp/deploy_key.pem
+          chmod 400 /tmp/deploy_key.pem
+
+          SSH="ssh -i /tmp/deploy_key.pem -o StrictHostKeyChecking=no ec2-user@$EC2_HOST"
+          JAR=$(find target -name "mail-engine-backend-*.jar" ! -name "*.original" | head -1)
+
+          # Allow ec2-user to overwrite the jar, then hand back to app user after copy
+          $SSH "sudo chown ec2-user:ec2-user /opt/mail-engine/app.jar 2>/dev/null || true"
+          scp -i /tmp/deploy_key.pem -o StrictHostKeyChecking=no \
+            "$JAR" "ec2-user@$EC2_HOST:/opt/mail-engine/app.jar"
+          $SSH "sudo chown mailengine:mailengine /opt/mail-engine/app.jar && sudo systemctl restart mail-engine"
+
+          # Wait and confirm service is up
+          sleep 8
+          $SSH "sudo systemctl is-active mail-engine"
+
+          rm -f /tmp/deploy_key.pem
