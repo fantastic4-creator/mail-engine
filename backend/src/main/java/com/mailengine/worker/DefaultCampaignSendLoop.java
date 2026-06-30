@@ -9,8 +9,10 @@ import com.mailengine.domain.MessageJob;
 import com.mailengine.domain.MessageJobStatus;
 import com.mailengine.domain.OutboundIp;
 import com.mailengine.domain.OutboundMessage;
+import com.mailengine.domain.SuppressionRecord;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -54,16 +56,17 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
             }
 
             OutboundMessage outboundMessage = deliveryGateway.deliver(campaign, messageJob, outboundIp);
-            if (outboundMessage.deliveryStatus().startsWith("SMTP_FAILED")) {
+            String status = outboundMessage.deliveryStatus();
+            if (status.startsWith("SMTP_HARD_BOUNCE")) {
+                suppress(messageJob, "BOUNCE");
+                store.saveMessageJob(messageJob.complete(MessageJobStatus.FAILED, outboundMessage.sentAt(), status));
+            } else if (status.startsWith("SMTP_FAILED")) {
                 if (messageJob.retryCount() < runtimeProperties.getRetryMaxAttempts()) {
                     long backoffSeconds = runtimeProperties.getRetryBackoffSeconds() * (1L << messageJob.retryCount());
-                    Instant nextRetryAt = Instant.now().plusSeconds(backoffSeconds);
-                    store.saveMessageJob(messageJob.scheduleRetry(nextRetryAt));
+                    store.saveMessageJob(messageJob.scheduleRetry(Instant.now().plusSeconds(backoffSeconds)));
                 } else {
-                    store.saveMessageJob(messageJob.complete(
-                            MessageJobStatus.FAILED,
-                            outboundMessage.sentAt(),
-                            outboundMessage.deliveryStatus()));
+                    suppress(messageJob, "BOUNCE");
+                    store.saveMessageJob(messageJob.complete(MessageJobStatus.FAILED, outboundMessage.sentAt(), status));
                 }
             } else {
                 store.saveMessageJob(messageJob.complete(MessageJobStatus.SENT, outboundMessage.sentAt(), null));
@@ -75,5 +78,14 @@ public class DefaultCampaignSendLoop implements CampaignSendLoop {
         if (!hasPending) {
             store.saveCampaign(campaign.withStatus(CampaignStatus.SENT));
         }
+    }
+
+    private void suppress(MessageJob messageJob, String reason) {
+        store.saveSuppression(new SuppressionRecord(
+                UUID.randomUUID(),
+                messageJob.tenantId(),
+                messageJob.recipientEmail(),
+                reason,
+                Instant.now()));
     }
 }
