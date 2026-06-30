@@ -1,5 +1,6 @@
 package com.mailengine.data;
 
+import com.mailengine.domain.ApiKey;
 import com.mailengine.domain.Campaign;
 import com.mailengine.domain.IpPool;
 import com.mailengine.domain.MessageJob;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "mail-engine.runtime.storage-mode", havingValue = "in-memory", matchIfMissing = true)
 public class InMemoryPlatformStateStore implements PlatformStateStore {
 
+    private final ConcurrentMap<UUID, ApiKey> apiKeys = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Tenant> tenants = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, SendingDomain> domains = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Campaign> campaigns = new ConcurrentHashMap<>();
@@ -241,5 +243,50 @@ public class InMemoryPlatformStateStore implements PlatformStateStore {
         return outboundMessages.values().stream()
                 .sorted(Comparator.comparing(OutboundMessage::sentAt).reversed())
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public ApiKey saveApiKey(ApiKey apiKey) {
+        apiKeys.put(apiKey.id(), apiKey);
+        return apiKey;
+    }
+
+    @Override
+    public Optional<ApiKey> findApiKeyByHash(String keyHash) {
+        return apiKeys.values().stream()
+                .filter(k -> k.keyHash().equals(keyHash))
+                .findFirst();
+    }
+
+    @Override
+    public List<ApiKey> listApiKeys(UUID tenantId) {
+        return apiKeys.values().stream()
+                .filter(k -> k.tenantId().equals(tenantId))
+                .sorted(Comparator.comparing(ApiKey::createdAt).reversed())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteApiKey(UUID keyId) {
+        apiKeys.remove(keyId);
+    }
+
+    @Override
+    public void touchApiKeyLastUsed(UUID keyId) {
+        ApiKey key = apiKeys.get(keyId);
+        if (key != null) {
+            apiKeys.put(keyId, new ApiKey(key.id(), key.tenantId(), key.name(), key.keyHash(), key.keyPrefix(), Instant.now(), key.createdAt()));
+        }
+    }
+
+    @Override
+    public int cancelCampaignJobs(UUID campaignId) {
+        Instant now = Instant.now();
+        List<MessageJob> toCancel = messageJobs.values().stream()
+                .filter(j -> j.campaignId().equals(campaignId))
+                .filter(j -> j.status() == MessageJobStatus.PENDING || j.status() == MessageJobStatus.CLAIMED)
+                .collect(Collectors.toList());
+        toCancel.forEach(j -> messageJobs.put(j.id(), j.complete(MessageJobStatus.FAILED, now, "Campaign cancelled")));
+        return toCancel.size();
     }
 }

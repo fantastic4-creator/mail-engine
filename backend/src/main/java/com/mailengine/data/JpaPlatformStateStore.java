@@ -1,5 +1,6 @@
 package com.mailengine.data;
 
+import com.mailengine.data.entity.ApiKeyEntity;
 import com.mailengine.data.entity.CampaignEntity;
 import com.mailengine.data.entity.IpPoolEntity;
 import com.mailengine.data.entity.MessageJobEntity;
@@ -9,6 +10,7 @@ import com.mailengine.data.entity.RecipientEntity;
 import com.mailengine.data.entity.SendingDomainEntity;
 import com.mailengine.data.entity.SuppressionRecordEntity;
 import com.mailengine.data.entity.TenantEntity;
+import com.mailengine.data.repository.ApiKeyRepository;
 import com.mailengine.data.repository.CampaignRepository;
 import com.mailengine.data.repository.IpPoolRepository;
 import com.mailengine.data.repository.MessageJobRepository;
@@ -18,6 +20,7 @@ import com.mailengine.data.repository.RecipientRepository;
 import com.mailengine.data.repository.SendingDomainRepository;
 import com.mailengine.data.repository.SuppressionRecordRepository;
 import com.mailengine.data.repository.TenantRepository;
+import com.mailengine.domain.ApiKey;
 import com.mailengine.domain.Campaign;
 import com.mailengine.domain.IpPool;
 import com.mailengine.domain.MessageJob;
@@ -51,6 +54,7 @@ public class JpaPlatformStateStore implements PlatformStateStore {
     private final MessageJobRepository messageJobs;
     private final SuppressionRecordRepository suppressions;
     private final OutboundMessageRepository outboundMessages;
+    private final ApiKeyRepository apiKeys;
 
     public JpaPlatformStateStore(
             TenantRepository tenants,
@@ -61,7 +65,8 @@ public class JpaPlatformStateStore implements PlatformStateStore {
             RecipientRepository recipients,
             MessageJobRepository messageJobs,
             SuppressionRecordRepository suppressions,
-            OutboundMessageRepository outboundMessages) {
+            OutboundMessageRepository outboundMessages,
+            ApiKeyRepository apiKeys) {
         this.tenants = tenants;
         this.domains = domains;
         this.ipPools = ipPools;
@@ -71,6 +76,7 @@ public class JpaPlatformStateStore implements PlatformStateStore {
         this.messageJobs = messageJobs;
         this.suppressions = suppressions;
         this.outboundMessages = outboundMessages;
+        this.apiKeys = apiKeys;
     }
 
     @Override
@@ -269,5 +275,44 @@ public class JpaPlatformStateStore implements PlatformStateStore {
         return outboundMessages.findAllByOrderBySentAtDesc().stream()
                 .map(OutboundMessageEntity::toDomain)
                 .toList();
+    }
+
+    @Override
+    public ApiKey saveApiKey(ApiKey apiKey) {
+        return apiKeys.save(ApiKeyEntity.from(apiKey)).toDomain();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ApiKey> findApiKeyByHash(String keyHash) {
+        return apiKeys.findByKeyHash(keyHash).map(ApiKeyEntity::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ApiKey> listApiKeys(UUID tenantId) {
+        return apiKeys.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
+                .map(ApiKeyEntity::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void deleteApiKey(UUID keyId) {
+        apiKeys.deleteById(keyId);
+    }
+
+    @Override
+    public void touchApiKeyLastUsed(UUID keyId) {
+        apiKeys.touchLastUsed(keyId, Instant.now());
+    }
+
+    @Override
+    public int cancelCampaignJobs(UUID campaignId) {
+        return messageJobs.cancelActiveJobs(
+                campaignId,
+                List.of(MessageJobStatus.PENDING, MessageJobStatus.CLAIMED),
+                MessageJobStatus.FAILED,
+                Instant.now(),
+                "Campaign cancelled");
     }
 }

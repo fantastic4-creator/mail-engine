@@ -1,5 +1,6 @@
 package com.mailengine.data;
 
+import com.mailengine.domain.ApiKey;
 import com.mailengine.domain.Campaign;
 import com.mailengine.domain.IpPool;
 import com.mailengine.domain.MessageJob;
@@ -70,4 +71,16 @@ public interface PlatformStateStore {
     OutboundMessage saveOutboundMessage(OutboundMessage message);
 
     List<OutboundMessage> listOutboundMessages();
+
+    ApiKey saveApiKey(ApiKey apiKey);
+
+    Optional<ApiKey> findApiKeyByHash(String keyHash);
+
+    List<ApiKey> listApiKeys(UUID tenantId);
+
+    void deleteApiKey(UUID keyId);
+
+    void touchApiKeyLastUsed(UUID keyId);
+
+    int cancelCampaignJobs(UUID campaignId);
 }

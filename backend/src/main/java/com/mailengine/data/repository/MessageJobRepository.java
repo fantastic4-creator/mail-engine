@@ -48,4 +48,13 @@ public interface MessageJobRepository extends JpaRepository<MessageJobEntity, UU
     void resetRetryToPending(
             @Param("ids") List<UUID> ids,
             @Param("pending") MessageJobStatus pending);
+
+    @Modifying
+    @Query("UPDATE MessageJobEntity j SET j.status = :newStatus, j.completedAt = :now, j.lastError = :reason WHERE j.campaignId = :campaignId AND j.status IN :statuses")
+    int cancelActiveJobs(
+            @Param("campaignId") UUID campaignId,
+            @Param("statuses") List<MessageJobStatus> statuses,
+            @Param("newStatus") MessageJobStatus newStatus,
+            @Param("now") Instant now,
+            @Param("reason") String reason);
 }

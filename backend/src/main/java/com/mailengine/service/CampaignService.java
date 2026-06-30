@@ -174,6 +174,14 @@ public class CampaignService {
                 .collect(Collectors.toList());
     }
 
+    public CampaignResponse cancelCampaign(UUID campaignId) {
+        Campaign campaign = store.findCampaign(campaignId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Campaign not found"));
+        store.cancelCampaignJobs(campaignId);
+        Campaign cancelled = store.saveCampaign(campaign.withStatus(CampaignStatus.FAILED));
+        return toResponse(cancelled);
+    }
+
     private List<String> parseCsvEmails(MultipartFile file) throws IOException {
         List<String> emails = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(
