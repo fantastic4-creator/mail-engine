@@ -23,6 +23,7 @@ public class MailEngineRuntimeProperties {
     private long sendLoopPollMs = 5000;
     private int retryMaxAttempts = 5;
     private long retryBackoffSeconds = 300;
+    private boolean skipDomainVerification = false;
 
     public DeliveryMode getDeliveryMode() {
         return deliveryMode;
@@ -166,6 +167,14 @@ public class MailEngineRuntimeProperties {
 
     public void setRetryBackoffSeconds(long retryBackoffSeconds) {
         this.retryBackoffSeconds = retryBackoffSeconds;
+    }
+
+    public boolean isSkipDomainVerification() {
+        return skipDomainVerification;
+    }
+
+    public void setSkipDomainVerification(boolean skipDomainVerification) {
+        this.skipDomainVerification = skipDomainVerification;
     }
 
     public enum DeliveryMode {

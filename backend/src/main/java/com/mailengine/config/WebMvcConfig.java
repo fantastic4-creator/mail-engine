@@ -22,6 +22,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(new ApiKeyAuthInterceptor(apiKeyService, objectMapper))
                 .excludePathPatterns(
                         "/actuator/**",
+                        "/api/health",
+                        "/api/runtime",
                         "/unsubscribe",
                         "/webhooks/**",
                         "/api/tenants",           // create first tenant

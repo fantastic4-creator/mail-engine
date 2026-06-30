@@ -94,6 +94,12 @@ public class TenantService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Domain not found for tenant");
         }
 
+        if (runtimeProperties.isSkipDomainVerification()) {
+            SendingDomain verified = domain.withVerificationStatus(DomainVerificationStatus.VERIFIED, Instant.now());
+            store.saveDomain(verified);
+            return toDomainResponse(verified);
+        }
+
         String expectedRecord = "mail-engine-verification=" + domain.verificationToken();
         String lookupName = "_mailengine." + domain.domainName();
 
