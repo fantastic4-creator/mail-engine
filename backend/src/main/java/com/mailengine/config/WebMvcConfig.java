@@ -20,6 +20,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new ApiKeyAuthInterceptor(apiKeyService, objectMapper))
-                .excludePathPatterns("/actuator/**", "/unsubscribe", "/webhooks/**");
+                .excludePathPatterns(
+                        "/actuator/**",
+                        "/unsubscribe",
+                        "/webhooks/**",
+                        "/api/tenants",           // create first tenant
+                        "/api/tenants/*/api-keys" // create first API key per tenant
+                );
     }
 }
