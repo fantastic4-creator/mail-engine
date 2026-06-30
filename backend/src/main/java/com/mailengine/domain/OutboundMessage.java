@@ -14,7 +14,6 @@ public record OutboundMessage(
         String outboundIpAddress,
         String recipientEmail,
         String subject,
-        String body,
         String deliveryStatus,
         Instant sentAt
 ) {

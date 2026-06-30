@@ -23,7 +23,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/actuator/**",
                         "/api/health",
-                        "/api/runtime",
                         "/unsubscribe",
                         "/webhooks/**",
                         "/api/tenants",           // create first tenant

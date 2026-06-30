@@ -24,11 +24,6 @@ public class RuntimeController {
                 "profiles", Arrays.asList(environment.getActiveProfiles()),
                 "deliveryMode", runtimeProperties.getDeliveryMode().name(),
                 "storageMode", runtimeProperties.getStorageMode(),
-                "smtpRelayMode", runtimeProperties.getSmtpRelayMode(),
-                "smtpHost", runtimeProperties.getSmtpHost(),
-                "smtpPort", runtimeProperties.getSmtpPort(),
-                "smtpAuthEnabled", runtimeProperties.isSmtpAuthEnabled(),
-                "smtpStarttlsEnabled", runtimeProperties.isSmtpStarttlsEnabled(),
                 "fromLocalPart", runtimeProperties.getFromLocalPart(),
                 "dkimSelector", runtimeProperties.getDkimSelector()
         );

@@ -45,7 +45,6 @@ public class ConfigurableDeliveryGateway implements DeliveryGateway {
     public OutboundMessage deliver(Campaign campaign, MessageJob messageJob, OutboundIp outboundIp) {
         String status = switch (runtimeProperties.getDeliveryMode()) {
             case LOCAL_OUTBOX -> "LOCAL_CAPTURED";
-            case AWS_SMTP_RELAY -> "QUEUED_FOR_SMTP_RELAY";
             case SMTP -> sendSmtp(campaign, messageJob);
         };
 
@@ -60,7 +59,6 @@ public class ConfigurableDeliveryGateway implements DeliveryGateway {
                 outboundIp.publicIpAddress(),
                 messageJob.recipientEmail(),
                 campaign.subject(),
-                campaign.body(),
                 status,
                 Instant.now()
         );

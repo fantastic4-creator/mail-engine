@@ -7,7 +7,6 @@ public class MailEngineRuntimeProperties {
 
     private DeliveryMode deliveryMode = DeliveryMode.LOCAL_OUTBOX;
     private String storageMode = "in-memory";
-    private String smtpRelayMode = "disabled";
     private String smtpHost = "localhost";
     private int smtpPort = 1025;
     private String smtpUsername = "";
@@ -39,14 +38,6 @@ public class MailEngineRuntimeProperties {
 
     public void setStorageMode(String storageMode) {
         this.storageMode = storageMode;
-    }
-
-    public String getSmtpRelayMode() {
-        return smtpRelayMode;
-    }
-
-    public void setSmtpRelayMode(String smtpRelayMode) {
-        this.smtpRelayMode = smtpRelayMode;
     }
 
     public String getSmtpHost() {
@@ -179,7 +170,6 @@ public class MailEngineRuntimeProperties {
 
     public enum DeliveryMode {
         LOCAL_OUTBOX,
-        AWS_SMTP_RELAY,
         SMTP
     }
 }

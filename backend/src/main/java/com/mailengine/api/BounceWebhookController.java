@@ -2,8 +2,6 @@ package com.mailengine.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mailengine.api.dto.SesBounce;
-import com.mailengine.api.dto.SesComplaint;
 import com.mailengine.api.dto.SesNotificationMessage;
 import com.mailengine.api.dto.SesRecipient;
 import com.mailengine.api.dto.SnsEnvelope;
