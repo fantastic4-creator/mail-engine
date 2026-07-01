@@ -2,6 +2,33 @@
 
 Mail Engine on OCI Always Free tier — zero cost, no port 25 restrictions.
 
+## Automated Scripts (use these)
+
+Once you have an OCI instance, the full deployment is 4 commands:
+
+```bash
+# 1. Wait for ARM capacity and create instance (saves OCI_IP to .state automatically)
+bash scripts/oracle/retry-instance.sh
+
+# 2. Install Java 21, PostgreSQL, Postfix, systemd service (run once)
+bash scripts/oracle/07-setup-server.sh
+
+# 3. Build JAR locally and deploy to OCI
+bash scripts/oracle/08-deploy-app.sh
+
+# 4. Create tenant, API key, domain, IP pool
+bash scripts/oracle/09-bootstrap-tenant.sh
+```
+
+To tear down everything:
+```bash
+bash scripts/oracle/10-destroy-all.sh
+```
+
+Network infrastructure (VCN, subnet, security list) was provisioned in a prior session and IDs are saved in `scripts/oracle/.state`. If you need to recreate it, follow Steps 1-2 below manually via OCI Console.
+
+---
+
 ## Why OCI over AWS
 
 | | AWS (current) | OCI Always Free |
