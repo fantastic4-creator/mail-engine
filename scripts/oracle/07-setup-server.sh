@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run ONCE on a fresh OCI instance to install and configure everything.
+# Works on both 1 GB (VM.Standard.E2.1.Micro) and larger ARM instances.
 # Usage: bash scripts/oracle/07-setup-server.sh
-# Pre-requisite: compute instance must exist and OCI_IP must be set in .state
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -17,32 +17,63 @@ SSH="ssh $SSH_OPTS opc@$OCI_IP"
 echo "=== Setting up OCI instance at $OCI_IP ==="
 
 # ── Wait for SSH ──────────────────────────────────────────────────────────────
-echo "[1/7] Waiting for SSH to become available..."
+echo "[1/8] Waiting for SSH to become available..."
 for i in {1..24}; do
   ssh $SSH_OPTS opc@$OCI_IP "true" 2>/dev/null && echo "  Connected!" && break
   echo "  attempt $i/24 — waiting 15s..."
   sleep 15
 done
 
+# ── Swap (critical on 1 GB instances) ─────────────────────────────────────────
+echo "[2/8] Adding 2 GB swap (needed on 1 GB RAM instance)..."
+$SSH "
+  if ! swapon --show | grep -q swapfile; then
+    sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+    echo 'Swap created and enabled'
+  else
+    echo 'Swap already configured'
+  fi
+  free -h | grep -E 'Mem|Swap'
+"
+
 # ── Java 21 ───────────────────────────────────────────────────────────────────
-echo "[2/7] Installing Java 21..."
+echo "[3/8] Installing Java 21..."
 $SSH "sudo yum install -y java-21-openjdk-headless 2>&1 | tail -5"
 $SSH "java -version 2>&1"
 
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
-echo "[3/7] Installing PostgreSQL..."
+echo "[4/8] Installing PostgreSQL..."
 $SSH "sudo yum install -y postgresql-server postgresql 2>&1 | tail -5"
 $SSH "sudo postgresql-setup --initdb 2>&1 || true"
-# Allow password auth for TCP connections (host entries)
+
+# Allow TCP password auth
 $SSH "sudo sed -i 's/\bident\b/md5/g; s/\bpeer\b/md5/g' /var/lib/pgsql/data/pg_hba.conf"
+
+# Tune for 1 GB RAM (reduce defaults)
+$SSH "
+  PG_CONF=\$(sudo find /var/lib/pgsql -name postgresql.conf | head -1)
+  echo '
+# Mail Engine memory tuning for 1 GB instance
+shared_buffers = 32MB
+work_mem = 2MB
+maintenance_work_mem = 16MB
+max_connections = 10
+' | sudo tee -a \"\$PG_CONF\" > /dev/null
+  echo \"Tuned: \$PG_CONF\"
+"
+
 $SSH "sudo systemctl enable postgresql && sudo systemctl start postgresql"
 $SSH "sudo -u postgres psql -c \"CREATE USER mailengine WITH PASSWORD 'mailengine';\" 2>/dev/null || true"
 $SSH "sudo -u postgres psql -c \"CREATE DATABASE mailengine OWNER mailengine;\" 2>/dev/null || true"
-echo "  Testing PostgreSQL connection..."
+echo "  Testing connection..."
 $SSH "PGPASSWORD=mailengine psql -h localhost -U mailengine -d mailengine -c 'SELECT 1 AS ok;'"
 
 # ── Postfix ───────────────────────────────────────────────────────────────────
-echo "[4/7] Installing and configuring Postfix..."
+echo "[5/8] Installing and configuring Postfix..."
 $SSH "sudo yum install -y postfix 2>&1 | tail -5"
 $SSH "sudo postconf -e 'myhostname = mail.consult.rissolv.com'"
 $SSH "sudo postconf -e 'mydomain = consult.rissolv.com'"
@@ -54,12 +85,11 @@ $SSH "sudo systemctl enable postfix && sudo systemctl restart postfix"
 $SSH "sudo ss -tlnp | grep ':25' && echo 'Postfix listening on :25 OK'"
 
 # ── App directory + env file ──────────────────────────────────────────────────
-echo "[5/7] Creating app directory and environment config..."
+echo "[6/8] Creating app directory and environment config..."
 $SSH "sudo mkdir -p /opt/mail-engine && sudo chown opc:opc /opt/mail-engine"
 
 HMAC_SECRET=$(openssl rand -hex 32)
 
-# Write env file locally then scp — avoids SSH heredoc quoting issues
 TMP_ENV=$(mktemp)
 cat > "$TMP_ENV" <<EOF
 MAIL_ENGINE_DELIVERY_MODE=smtp
@@ -74,17 +104,22 @@ MAIL_ENGINE_DKIM_SELECTOR=me2
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/mailengine
 SPRING_DATASOURCE_USERNAME=mailengine
 SPRING_DATASOURCE_PASSWORD=mailengine
-MAIL_ENGINE_MAX_SENDS_PER_HOUR=50
+MAIL_ENGINE_MAX_SENDS_PER_HOUR=100
 EOF
 
 scp $SSH_OPTS "$TMP_ENV" "opc@$OCI_IP:/opt/mail-engine/app.env"
 rm -f "$TMP_ENV"
 $SSH "chmod 600 /opt/mail-engine/app.env"
-echo "  HMAC secret saved: $HMAC_SECRET"
+echo "  HMAC secret: $HMAC_SECRET"
 echo "UNSUBSCRIBE_HMAC_SECRET=$HMAC_SECRET" >> "$STATE_FILE"
 
-# ── Systemd service ───────────────────────────────────────────────────────────
-echo "[6/7] Creating systemd service..."
+# ── Systemd service (with JVM tuning for 1 GB) ────────────────────────────────
+echo "[7/8] Creating systemd service..."
+# JVM flags for 1 GB RAM:
+#   -Xmx256m     cap heap at 256 MB
+#   -Xms64m      start heap small
+#   -XX:MaxMetaspaceSize=128m  cap class metadata
+#   -XX:+UseSerialGC  single-threaded GC, lower overhead than G1GC
 TMP_SVC=$(mktemp)
 cat > "$TMP_SVC" <<'EOF'
 [Unit]
@@ -94,7 +129,12 @@ After=network.target postgresql.service
 [Service]
 User=opc
 EnvironmentFile=/opt/mail-engine/app.env
-ExecStart=/usr/bin/java -jar /opt/mail-engine/app.jar
+ExecStart=/usr/bin/java \
+  -Xmx256m -Xms64m \
+  -XX:MaxMetaspaceSize=128m \
+  -XX:+UseSerialGC \
+  -Djava.awt.headless=true \
+  -jar /opt/mail-engine/app.jar
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=10
@@ -113,12 +153,14 @@ $SSH "sudo systemctl daemon-reload && sudo systemctl enable mail-engine"
 echo "  Systemd service enabled (not started — no JAR yet)"
 
 # ── OS-level firewall ─────────────────────────────────────────────────────────
-echo "[7/7] Opening OS firewall ports..."
+echo "[8/8] Opening OS firewall ports..."
 $SSH "sudo firewall-cmd --permanent --add-port=8080/tcp 2>/dev/null || true"
 $SSH "sudo firewall-cmd --permanent --add-port=25/tcp 2>/dev/null || true"
 $SSH "sudo firewall-cmd --reload 2>/dev/null || true"
-$SSH "sudo firewall-cmd --list-ports 2>/dev/null || echo '(firewalld not active — OCI security list is the firewall)'"
+$SSH "sudo firewall-cmd --list-ports 2>/dev/null || echo '(firewalld not running — OCI security list is the firewall)'"
 
 echo ""
 echo "=== Server setup complete ==="
+echo "  RAM  : ~1 GB (JVM capped at 256m heap + 128m metaspace)"
+echo "  Swap : 2 GB"
 echo "Next: bash scripts/oracle/08-deploy-app.sh"
