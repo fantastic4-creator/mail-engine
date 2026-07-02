@@ -56,6 +56,7 @@ public class CampaignService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant must have an active outbound IP before sending"));
 
         List<String> recipientEmails = normalizeRecipients(request);
+        int maxSendsPerHour = request.maxSendsPerHour() != null ? request.maxSendsPerHour() : 0;
         Instant now = Instant.now();
         Campaign campaign = new Campaign(
                 UUID.randomUUID(),
@@ -65,6 +66,7 @@ public class CampaignService {
                 request.subject().trim(),
                 request.body(),
                 recipientEmails.size(),
+                maxSendsPerHour,
                 CampaignStatus.SENDING,
                 now
         );
@@ -140,7 +142,8 @@ public class CampaignService {
             Campaign updated = new Campaign(
                     campaign.id(), campaign.tenantId(), campaign.domainId(),
                     campaign.name(), campaign.subject(), campaign.body(),
-                    campaign.recipientCount() + newEmails.size(), campaign.status(), campaign.createdAt());
+                    campaign.recipientCount() + newEmails.size(), campaign.maxSendsPerHour(),
+                    campaign.status(), campaign.createdAt());
             store.saveCampaign(updated);
         }
 
@@ -211,6 +214,7 @@ public class CampaignService {
                 campaign.subject(),
                 campaign.recipientCount(),
                 store.listMessageJobs(campaign.id()).size(),
+                campaign.maxSendsPerHour(),
                 campaign.status().name(),
                 campaign.createdAt()
         );

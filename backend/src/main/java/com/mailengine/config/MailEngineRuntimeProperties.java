@@ -22,6 +22,7 @@ public class MailEngineRuntimeProperties {
     private long sendLoopPollMs = 5000;
     private int retryMaxAttempts = 5;
     private long retryBackoffSeconds = 300;
+    private int maxSendsPerHour = 0;
     private boolean skipDomainVerification = false;
 
     public DeliveryMode getDeliveryMode() {
@@ -158,6 +159,14 @@ public class MailEngineRuntimeProperties {
 
     public void setRetryBackoffSeconds(long retryBackoffSeconds) {
         this.retryBackoffSeconds = retryBackoffSeconds;
+    }
+
+    public int getMaxSendsPerHour() {
+        return maxSendsPerHour;
+    }
+
+    public void setMaxSendsPerHour(int maxSendsPerHour) {
+        this.maxSendsPerHour = maxSendsPerHour;
     }
 
     public boolean isSkipDomainVerification() {

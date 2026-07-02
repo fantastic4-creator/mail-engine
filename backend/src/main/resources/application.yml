@@ -40,6 +40,7 @@ mail-engine:
     send-loop-poll-ms: ${MAIL_ENGINE_SEND_LOOP_POLL_MS:5000}
     retry-max-attempts: ${MAIL_ENGINE_RETRY_MAX_ATTEMPTS:5}
     retry-backoff-seconds: ${MAIL_ENGINE_RETRY_BACKOFF_SECONDS:300}
+    max-sends-per-hour: ${MAIL_ENGINE_MAX_SENDS_PER_HOUR:0}
 
 management:
   endpoints:

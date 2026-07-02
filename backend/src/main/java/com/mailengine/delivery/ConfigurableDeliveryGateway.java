@@ -9,6 +9,7 @@ import com.mailengine.domain.OutboundMessage;
 import com.mailengine.domain.SendingDomain;
 import com.mailengine.service.UnsubscribeTokenService;
 import jakarta.mail.MessagingException;
+import jakarta.mail.SendFailedException;
 import jakarta.mail.internet.MimeMessage;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
@@ -21,6 +22,7 @@ import java.util.UUID;
 import net.markenwerk.utils.mail.dkim.DkimException;
 import net.markenwerk.utils.mail.dkim.DkimMessage;
 import net.markenwerk.utils.mail.dkim.DkimSigner;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
@@ -95,10 +97,20 @@ public class ConfigurableDeliveryGateway implements DeliveryGateway {
             mailSender.send(toSend);
             return "SMTP_SENT";
         } catch (MessagingException | GeneralSecurityException | DkimException e) {
-            return "SMTP_FAILED: " + e.getMessage();
+            return truncate("SMTP_FAILED: " + e.getMessage());
+        } catch (MailSendException ex) {
+            // SendFailedException with invalid addresses = 5xx permanent rejection (hard bounce)
+            boolean hardBounce = ex.getCause() instanceof SendFailedException sfe
+                    && sfe.getInvalidAddresses() != null
+                    && sfe.getInvalidAddresses().length > 0;
+            return truncate((hardBounce ? "SMTP_HARD_BOUNCE" : "SMTP_FAILED") + ": " + ex.getMessage());
         } catch (RuntimeException ex) {
-            return "SMTP_FAILED: " + ex.getMessage();
+            return truncate("SMTP_FAILED: " + ex.getMessage());
         }
+    }
+
+    private static String truncate(String s) {
+        return s != null && s.length() > 1000 ? s.substring(0, 1000) : s;
     }
 
     private JavaMailSenderImpl buildMailSender() {
