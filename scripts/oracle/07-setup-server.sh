@@ -40,14 +40,24 @@ $SSH "
   free -h | grep -E 'Mem|Swap'
 "
 
-# ── Java 21 ───────────────────────────────────────────────────────────────────
-echo "[3/8] Installing Java 21..."
-$SSH "sudo yum install -y java-21-openjdk-headless 2>&1 | tail -5"
-$SSH "java -version 2>&1"
+# ── Java 21 via Temurin tar.gz (avoids yum OOM on 1 GB instances) ─────────────
+echo "[3/8] Installing Java 21 (Eclipse Temurin JRE, tar.gz)..."
+$SSH '
+  JRE_DIR=/opt/java
+  if [ ! -f "$JRE_DIR/bin/java" ]; then
+    JRE_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.7%2B6/OpenJDK21U-jre_x64_linux_hotspot_21.0.7_6.tar.gz"
+    echo "Downloading Temurin 21 JRE (~74 MB)..."
+    curl -L --progress-bar -o /tmp/temurin21-jre.tar.gz "$JRE_URL"
+    sudo mkdir -p "$JRE_DIR"
+    sudo tar -xzf /tmp/temurin21-jre.tar.gz -C "$JRE_DIR" --strip-components=1
+    rm -f /tmp/temurin21-jre.tar.gz
+  fi
+  /opt/java/bin/java -version
+'
 
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
-echo "[4/8] Installing PostgreSQL..."
-$SSH "sudo yum install -y postgresql-server postgresql 2>&1 | tail -5"
+echo "[4/8] Installing PostgreSQL + Postfix via yum..."
+$SSH "sudo yum install -y postgresql-server postgresql postfix 2>&1 | tail -5"
 $SSH "sudo postgresql-setup --initdb 2>&1 || true"
 
 # Allow TCP password auth
@@ -73,8 +83,7 @@ echo "  Testing connection..."
 $SSH "PGPASSWORD=mailengine psql -h localhost -U mailengine -d mailengine -c 'SELECT 1 AS ok;'"
 
 # ── Postfix ───────────────────────────────────────────────────────────────────
-echo "[5/8] Installing and configuring Postfix..."
-$SSH "sudo yum install -y postfix 2>&1 | tail -5"
+echo "[5/8] Configuring Postfix..."
 $SSH "sudo postconf -e 'myhostname = mail.consult.rissolv.com'"
 $SSH "sudo postconf -e 'mydomain = consult.rissolv.com'"
 $SSH "sudo postconf -e 'myorigin = consult.rissolv.com'"
@@ -129,7 +138,7 @@ After=network.target postgresql.service
 [Service]
 User=opc
 EnvironmentFile=/opt/mail-engine/app.env
-ExecStart=/usr/bin/java \
+ExecStart=/opt/java/bin/java \
   -Xmx256m -Xms64m \
   -XX:MaxMetaspaceSize=128m \
   -XX:+UseSerialGC \

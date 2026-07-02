@@ -25,7 +25,7 @@ while true; do
       --display-name mail-engine \
       --image-id "$IMAGE_ID" \
       --shape VM.Standard.A1.Flex \
-      --shape-config '{"ocpus":2,"memoryInGBs":12}' \
+      --shape-config '{"ocpus":4,"memoryInGBs":24}' \
       --subnet-id "$SUBNET_ID" \
       --assign-public-ip true \
       --ssh-authorized-keys-file ~/.ssh/oci-key.pub \

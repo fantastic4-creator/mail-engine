@@ -97,16 +97,20 @@ public class ConfigurableDeliveryGateway implements DeliveryGateway {
             mailSender.send(toSend);
             return "SMTP_SENT";
         } catch (MessagingException | GeneralSecurityException | DkimException e) {
-            return "SMTP_FAILED: " + e.getMessage();
+            return truncate("SMTP_FAILED: " + e.getMessage());
         } catch (MailSendException ex) {
             // SendFailedException with invalid addresses = 5xx permanent rejection (hard bounce)
             boolean hardBounce = ex.getCause() instanceof SendFailedException sfe
                     && sfe.getInvalidAddresses() != null
                     && sfe.getInvalidAddresses().length > 0;
-            return (hardBounce ? "SMTP_HARD_BOUNCE" : "SMTP_FAILED") + ": " + ex.getMessage();
+            return truncate((hardBounce ? "SMTP_HARD_BOUNCE" : "SMTP_FAILED") + ": " + ex.getMessage());
         } catch (RuntimeException ex) {
-            return "SMTP_FAILED: " + ex.getMessage();
+            return truncate("SMTP_FAILED: " + ex.getMessage());
         }
+    }
+
+    private static String truncate(String s) {
+        return s != null && s.length() > 1000 ? s.substring(0, 1000) : s;
     }
 
     private JavaMailSenderImpl buildMailSender() {
