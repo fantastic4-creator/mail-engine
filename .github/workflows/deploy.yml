@@ -111,7 +111,7 @@ jobs:
           OCI_HOST: ${{ secrets.OCI_HOST }}
           OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
         run: |
-          echo "$OCI_SSH_KEY" > /tmp/oci_key.pem
+          printf '%s\n' "$OCI_SSH_KEY" > /tmp/oci_key.pem
           chmod 400 /tmp/oci_key.pem
 
           SSH="ssh -i /tmp/oci_key.pem -o StrictHostKeyChecking=no opc@$OCI_HOST"
